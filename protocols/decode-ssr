@@ -1,0 +1,84 @@
+#!/bin/bash
+####################################
+#ssr://server:port:protocol:method:obfs:password_base64/?params_base64
+#	params_base64: obfsparam=obfsparam_base64&protoparam=protoparam_base64&remarks=remarks_base64&group=group_base64
+#
+#CMD:
+#	ssr-local -l $LISTEN -s $IP -p $PORT -k $PASSWD -m $METHOD
+####################################
+PARAM_LIST="ip port protocol method obfs password obfsparam protoparam remarks group"
+LISTEN=${LISTEN:-20000}
+
+#value_get base64_string index
+value_get(){
+	echo -n $1 | base64 -d 2>/dev/null | sed 's/[:\/\?]/ /g' | awk "{print \$$2}"
+}
+
+ip_get(){ 
+	local value
+	value=`value_get "$1" 1`
+	[ -z "$value" ] && return 1
+	echo "-s $value"
+}
+port_get(){
+	local value
+	value=`value_get "$1" 2`
+	[ -z "$value" ] && return 1
+	echo "-p $value"
+}
+protocol_get(){
+	local value
+	value=`value_get "$1" 3`
+	[ -z "$value" ] && return 0
+	echo "-O $value"
+}
+method_get(){
+	local value
+	value=`value_get "$1" 4`
+	[ -z "$value" ] && return 1
+	echo "-m $value"
+}
+obfs_get(){
+	local value
+	value=`value_get "$1" 5`
+	[ -z "$value" ] && return 0
+	echo "-o $value"
+}
+password_get(){
+	local value
+	value=`value_get "$1" 6`
+	[ -z "$value" ] && return 1
+	value=`echo "$value" | base64 -d`
+	echo "-k $value"
+}
+
+param_get(){
+	local params
+	params=`value_get $1 7`
+	[ -z "$params" ] && return 0
+	params=`echo -n "$params"| base64 -d 2>/dev/null | sed "s/.*$2=//;s/&.*//"`
+	[ -z "$params" ] && return 0
+	echo -n "$params" | base64 -d 2>/dev/null
+	return 0
+}
+obfsparam_get(){
+	local value
+	value=`param_get "$1" obfsparam`
+	[ -z "$value" ] && return 0
+	echo "-g $value"
+}
+protoparam_get(){
+	local value
+	value=`param_get "$1" protoparam`
+	[ -z "$value" ] && return 0
+	echo "-G $value"
+}
+remarks_get(){
+	return 0
+}
+group_get(){
+	return 0
+}
+
+#EXECUTE='ss-local -l "$LISTEN" $ip $port $passwd $method'
+EXECUTE='ssr-local -l $LISTEN $ip $port $method $password $obfs $obfsparam $protocol $protoparam'

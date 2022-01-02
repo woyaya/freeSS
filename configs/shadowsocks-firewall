@@ -1,0 +1,112 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          shadowsocks-firewall
+# Required-Start:    mountkernfs $network $local_fs $remote_fs $syslog
+# Required-Stop:     $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: shadowsocks firewall
+# Description:       Shadowsocks firewall
+### END INIT INFO
+
+# Author: woyaya <woyaya@gmail.com>
+
+# PATH should only include /usr/ if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DESC=shadowsocks-firewall       # Introduce a short description here
+NAME=shadowsocks-firewall       # Introduce the short server's name here
+DAEMON=/usr/sbin/iptables    # Introduce the server's location here
+DAEMON_ARGS=""               # Arguments to run the daemon with
+PIDFILE=/var/run/$NAME/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+
+SERVER_IP=34.92.116.94
+GATEWAY_MAC_FILTER=1
+
+# Exit if the package is not installed
+[ -x $DAEMON ] || exit 0
+
+#
+# Function that starts the daemon/service
+#
+do_start()
+{
+	# Create new chain
+	$DAEMON -t nat -N $NAME || return
+
+	# Ignore your shadowsocks server's addresses
+	# It's very IMPORTANT, just be careful.
+	$DAEMON -t nat -A $NAME -d $SERVER_IP -j RETURN
+
+	# Ignore LANs and any other addresses you'd like to bypass the proxy
+	# See Wikipedia and RFC5735 for full list of reserved networks.
+	# See ashi009/bestroutetb for a highly optimized CHN route list.
+	$DAEMON -t nat -A $NAME -d 0.0.0.0/8 -j RETURN
+	$DAEMON -t nat -A $NAME -d 172.16.0.0/12 -j RETURN
+	$DAEMON -t nat -A $NAME -d 192.168.0.0/16 -j RETURN
+	$DAEMON -t nat -A $NAME -d 10.0.0.0/8 -j RETURN
+	$DAEMON -t nat -A $NAME -d 127.0.0.0/8 -j RETURN
+	#$DAEMON -t nat -A $NAME -d 169.254.0.0/16 -j RETURN
+	#$DAEMON -t nat -A $NAME -d 224.0.0.0/4 -j RETURN
+	#$DAEMON -t nat -A $NAME -d 240.0.0.0/4 -j RETURN
+	 
+	# Anything else should be redirected to shadowsocks's local port
+	$DAEMON -t nat -A $NAME -p tcp -j REDIRECT --to-ports 10800
+	 
+	#Get MAC
+	[ "$GATEWAY_MAC_FILTER" = "1" ] && {
+		[ -z "$GATEWAY_MAC" ] && {
+			IP=`ip route show default | awk '{print $3}' | uniq`
+			[ -n "$IP" ] && GATEWAY_MAC=`arp -n $IP | grep $IP | awk '{print $3}'`
+		}
+		[ -n "$GATEWAY_MAC" ] && MAC_FILTER="-m mac --mac-source $GATEWAY_MAC"
+	}
+
+	# Apply the rules
+	$DAEMON -t nat -A PREROUTING $MAC_FILTER -p tcp -j $NAME
+}
+
+#
+# Function that stops the daemon/service
+#
+do_stop()
+{
+	while true
+	do
+		LINE=`$DAEMON -t nat -L PREROUTING --line-number | grep "$NAME" | awk '{print $1}' | head -n 1`
+		[ -z "$LINE" ] && break
+		$DAEMON -t nat -D PREROUTING $LINE
+	done
+	$DAEMON -t nat -F $NAME 2>/dev/null && $DAEMON -t nat -X $NAME
+}
+
+do_status()
+{
+	echo "$NAME status:"
+	$DAEMON -t nat -L PREROUTING -nv | grep "$NAME"
+	$DAEMON -t nat -L $NAME -nv
+}
+
+case "$1" in
+	start)
+		echo "Starting $DESC " "$NAME"
+		do_start
+	;;
+	stop)
+		echo "Stopping $DESC" "$NAME"
+		do_stop
+	;;
+	status)
+		do_status
+	;;
+	restart|force-reload)
+		echo "Restarting $DESC" "$NAME"
+		do_stop
+		do_start
+	;;
+	*)
+		echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+		exit 3
+	;;
+esac
+
