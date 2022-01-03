@@ -1,19 +1,45 @@
 #!/bin/bash
 ####################################
 #ss://method:password@server:port
-#
 #eg:
 #       aes-256-gcm:CUndSZnYsPKcu6Kj8THVMBHD@103.156.50.107:39772
-#
+#EncodeType1:
+#	(method:password | base64)+@server:port
+#EncodeType2:
+#	full_string | base64
 #CMD:
 #	ss-local -l $LISTEN -s $IP -p $PORT -k $PASSWD -m $METHOD
 ####################################
 PARAM_LIST="ip port passwd method"
 LISTEN=${LISTEN:-20000}
 
+decode_type1(){
+	local prefix
+	local suffix
+	local result
+	prefix=`echo -n $1 | sed 's/@.*//'`
+	suffix=`echo -n $1 | sed 's/.*@//'`
+	[ -z "$prefix" -o -z "$suffix" ] && return 1
+	result=`echo -n "$prefix" | base64 -d 2>/dev/null`
+	[ $? != 0 ] && result=`echo -n "${prefix}=" | base64 -d 2>/dev/null`
+	#Find ":" in result
+	prefix=`echo "$result" | sed 's/.*:.*//'`
+	[ -n "$prefix" ] && return 1
+	echo "${result}@${suffix}"
+}
+decode_type2(){
+	echo -n $1 | base64 -d 2>/dev/null
+	return 0
+}
+
 #value_get base64_string index
 value_get(){
-	echo -n $1 | sed 's/#.*//;s/ *$//' | base64 -d 2>/dev/null | sed 's/[:@]/ /g' | awk "{print \$$2}"
+	local value
+	value=`echo -n $1 | sed 's/#.*//;s/ *$//'`
+	[ -z "$value" ] && return 1
+	value=`decode_type1 "$value"`
+	[ $? != 0 ] && value=`decode_type2 "$value"`
+	echo -n $value | sed 's/[:@]/ /g' | awk "{print \$$2}"
 }
 
 ip_get(){ 

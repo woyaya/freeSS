@@ -119,23 +119,22 @@ decode "$CONTENT" $LISTEN || ERR "Decode resource fail: $resource"
 
 	TIMES=0
 	RETRY=3
+	RESULT=0
 	TIME_THRESHOLD=`expr $TIMEOUT "*" $RETRY`
 	TIME_THRESHOLD=`expr $TIME_THRESHOLD "*" 1000`
 
-	sleep 0.5
+	sleep 1
 	for i in `seq 1 $RETRY`;do
 		BEGIN=`date +"%s%3N"`
 		curl --max-time $TIMEOUT -s -x socks5h://127.0.0.1:$LISTEN $URL
-		RESULT=$?
-		[ "$RESULT" != "0" ] && {
-			kill $PID 2>/dev/null
-			EXIT
-		}
+		[ $? != 0 ] && RESULT=$((RESULT+1))
 		END=`date +"%s%3N"`
 		COST=`expr $END "-" $BEGIN`
 		TIMES=`expr $TIMES "+" $COST`
 	done
 	kill $PID 2>/dev/null
+	#[ "$RESULT" = "$RETRY" ] && EXIT
+	[ "$RESULT" = "$RETRY" ] && ERR "Resource fail: ${EXECUTE}"
 	#take more then 3S, ignore it
 	[ $TIMES -gt $TIME_THRESHOLD ] && EXIT
 	#TIMES=${TIMES:0-4}
