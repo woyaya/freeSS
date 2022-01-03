@@ -1,6 +1,11 @@
 #!/bin/sh
 
 FUN_DIR=${FUN_DIR:-./functions}
+CFG_DIR=${CFG_DIR:-./configs}
+CMD_DIR=${CMD_DIR:-./commands}
+PROTO_DIR=${PROTO_DIR:-./protocols}
+HTTP_FILE=/var/www/html/share/result.lst
+
 . $FUN_DIR/common.sh
 
 USAGE(){
@@ -39,5 +44,23 @@ done
 check_variables SRC || ERR "Not all key varables defined"
 check_files $SRC || ERR "Can not find src file: $SRC"
 
-LOG "Try get resource from $URL, with key \"$KEY\" and tag \"$TAG\""
+[ -f $HTTP_FILE  ] && MD5_HTTP=`md5sum $HTTP_FILE`
+MD5_SRC=`md5sum $SRC`
+LOG "MD5: $MD5_SRC, $MD5_HTTP"
+[ "$MD5_SRC" = "$MD5_HTTP" ] && {
+	WRN "File $SRC unchanged, do nothing"
+	return 0
+}
+cp $SRC $HTTP_FILE
 
+check_files $CFG_DIR/mqtt.cfg || ERR "Can not find mqtt setting"
+. $CFG_DIR/mqtt.cfg
+
+check_variables HOST TOPIC MESSAGE || ERR "Invalid mqtt config file: $CFG_DIR/mqtt.cfg"
+LOG "Public file changes"
+[ -n "$USER" ] && USER="-u $USER"
+[ -n "$PASSWD" ] && PASSWD="-P $PASSWD"
+[ -n "$PORT" ] && PORT="-p $PORT"
+[ -n "$QOS" ] && QOS="-q $QOS"
+LOG "mosquitto_pub -h $HOST $PORT $USER $PASSWD $QOS -t $TOPIC -m \"$MESSAGE\""
+mosquitto_pub -h $HOST $PORT $USER $PASSWD $QOS -t $TOPIC -m "$MESSAGE"

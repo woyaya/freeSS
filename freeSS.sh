@@ -85,7 +85,7 @@ FUN_DIR=${BASE}/functions
 CMD_DIR=${BASE}/commands
 CFG_DIR=${BASE}/configs
 PROTO_DIR=${BASE}/protocols
-export SRC_DIR FUN_DIR CMD_DIR CFG_DIR
+export SRC_DIR FUN_DIR CMD_DIR CFG_DIR PROTO_DIR
 
 [ ! -f $FUN_DIR/common.sh ] && {
 	echo "Invalid setting! file \"$FUN_DIR/common.sh\" not exist"
@@ -149,7 +149,7 @@ LOG "check valid resource size"
 [ -s $VALID_FILE ] || ERR "Fail: no proxy works in ${TIMEOUT}S"
 
 LOG "Sort valid server by responce time"
-cat $VALID_FILE | sort | sed 's/^[0-9]*\t//' >$VALID_FILE.tmp
+cat $VALID_FILE | sed 's/^[0-9]*\t//' | sort  >$VALID_FILE.tmp
 mv $VALID_FILE.tmp $VALID_FILE
 LOG "Result file: $VALID_FILE"
 [ -n "$FILE" ] && {

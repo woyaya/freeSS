@@ -1,6 +1,9 @@
 #!/bin/sh
 
 FUN_DIR=${FUN_DIR:-./functions}
+CFG_DIR=${CFG_DIR:-./configs}
+CMD_DIR=${CMD_DIR:-./commands}
+PROTO_DIR=${PROTO_DIR:-./protocols}
 . $FUN_DIR/common.sh
 
 USAGE(){
