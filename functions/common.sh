@@ -35,6 +35,20 @@ ERR(){
 	exit 1
 }
 
+base64_decode(){
+	local len
+	local str
+	local atta
+	local remainder
+	[ -z "$1" ] && return 1
+	str=`echo "$1" | sed 's/_/\//g;s/-/+/g'`
+	len=${#str}
+	remainder=$((len%4))
+	[ "$remainder" = 3 ] && atta="="
+	[ "$remainder" = 2 ] && atta="=="
+	echo -n "${str}${atta}" | base64 -d
+}
+
 wait_childs(){
 	local children="$@"
 	local EXIT=0

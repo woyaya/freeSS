@@ -11,7 +11,10 @@ LISTEN=${LISTEN:-20000}
 
 #value_get base64_string index
 value_get(){
-	echo -n $1 | base64 -d 2>/dev/null | sed 's/[:\/\?]/ /g' | awk "{print \$$2}"
+	local value
+	value=`base64_decode $1`
+	[ $? != 0 ] && return 1
+	echo "$value" | sed 's/[:\/\?]/ /g' | awk "{print \$$2}"
 }
 
 ip_get(){ 
