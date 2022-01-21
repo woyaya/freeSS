@@ -133,4 +133,5 @@ command_stop(){
 # command_run config_file
 command_run(){
 	nohup ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam >/dev/null 2>&1 &
+	echo "ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam >/dev/null 2>&1"
 }

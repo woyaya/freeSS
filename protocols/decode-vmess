@@ -191,6 +191,7 @@ command_stop(){
 
 # command_run config_file
 command_run(){
-	nohup v2ray -c $1 >/dev/null 2>&1
+	nohup v2ray -c $1 >/dev/null 2>&1 &
+	echo "v2ray -c $1 >/dev/null 2>&1"
 	sleep 1.5	#wait process ready
 }

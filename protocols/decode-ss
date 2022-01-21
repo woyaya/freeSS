@@ -87,6 +87,7 @@ command_stop(){
 
 # command_run config_file
 command_run(){
-	nohup ss-local -l $lport -s $ip -p $port -k $passwd -m $method >/dev/null 2>&1
+	nohup ss-local -l $lport -s $ip -p $port -k $passwd -m $method >/dev/null 2>&1 &
+	echo "ss-local -l $lport -s $ip -p $port -k $passwd -m $method >/dev/null 2>&1"
 }
 
