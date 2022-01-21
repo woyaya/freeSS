@@ -59,7 +59,6 @@ resource_parse(){
 	count=1
 	#set +H
 	[ -z "$DECODE" ] && return 1
-	value_get "$DECODE" $count
 	for name in $PARAM_LIST;do
 		value=`value_get "$DECODE" $count`
 		eval $name="$value"

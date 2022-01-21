@@ -35,7 +35,7 @@ resource_parse(){
 	[ $? != 0 ] && return 1
 	for name in $PARAM_LIST;do
 		value=`value_get "${DECODE}" "$name"`
-		echo "$name:$value"
+		#echo "$name:$value"
 		[ -z "$value" ] && {
 			eval $name=\"\"
 			continue

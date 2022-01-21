@@ -49,7 +49,7 @@ password_get(){
 	local value
 	value=`value_get "$1" 6`
 	[ -z "$value" ] && return 1
-	value=`echo "$value" | base64 -d`
+	value=`base64_decode "$value"`
 	echo "-k $value"
 }
 
@@ -57,9 +57,9 @@ param_get(){
 	local params
 	params=`value_get $1 7`
 	[ -z "$params" ] && return 0
-	params=`echo -n "$params"| base64 -d 2>/dev/null | sed "s/.*$2=//;s/&.*//"`
+	params=`echo "$params" | sed "s/.*$2=//;s/&.*//"`
 	[ -z "$params" ] && return 0
-	echo -n "$params" | base64 -d 2>/dev/null
+	base64_decode "$params"
 	return 0
 }
 obfsparam_get(){
@@ -81,17 +81,23 @@ group_get(){
 	return 0
 }
 
-#EXECUTE='ss-local -l "$LISTEN" $ip $port $passwd $method'
-EXECUTE='ssr-local -l $LISTEN $ip $port $method $password $obfs $obfsparam $protocol $protoparam'
-
 #################################
 #Public functions
 #resource_decode resource
 resource_decode(){
-	DECODE=`base64_decode $1` && return 0
-	#decode fail
-	DECODE=""
-	return 1
+	local params
+	local value
+	DECODE=`base64_decode $1` || {
+	      #decode fail
+		DECODE=""
+		return 1
+	}
+	value=`echo "$DECODE" | sed 's/.*\/?//'`
+	params=`base64_decode "$value"`
+	[ $? != 0 ] && return 0
+	value=`echo "$DECODE" | sed 's/\/?.*//'`
+	DECODE="${value}/?${params}"
+	return 0
 }
 
 #resource_parse resource
