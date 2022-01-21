@@ -4,21 +4,21 @@
 #eg:
 #       aes-256-gcm:CUndSZnYsPKcu6Kj8THVMBHD@103.156.50.107:39772
 #EncodeType1:
-#	(method:password | base64)+@server:port
+#	(method:password | base64)@server:port
 #EncodeType2:
 #	full_string | base64
 #CMD:
-#	ss-local -l $LISTEN -s $IP -p $PORT -k $PASSWD -m $METHOD
+#	ss-local -l $lport -s $IP -p $PORT -k $PASSWD -m $METHOD
 ####################################
-PARAM_LIST="ip port passwd method"
-LISTEN=${LISTEN:-20000}
+PARAM_LIST="method passwd ip port"
+CHECK_LIST="method passwd ip port"
 
 decode_type1(){
 	local prefix
 	local suffix
 	local result
-	prefix=`echo -n $1 | sed 's/@.*//'`
-	suffix=`echo -n $1 | sed 's/.*@//'`
+	prefix=`echo -n $1 | sed '/@/!d;s/@.*//'`
+	suffix=`echo -n $1 | sed '/@/!d;s/.*@//'`
 	[ -z "$prefix" -o -z "$suffix" ] && return 1
 	result=`base64_decode "$prefix"`
 	[ $? != 0 ] && return 1
@@ -26,6 +26,7 @@ decode_type1(){
 	prefix=`echo "$result" | sed 's/.*:.*//'`
 	[ -n "$prefix" ] && return 1
 	echo "${result}@${suffix}"
+	return 0
 }
 decode_type2(){
 	base64_decode "$1"
@@ -33,38 +34,60 @@ decode_type2(){
 
 #value_get base64_string index
 value_get(){
-	local value
-	value=`echo -n $1 | sed 's/#.*//;s/ *$//'`
-	[ -z "$value" ] && return 1
-	value=`decode_type1 "$value"`
-	[ $? != 0 ] && value=`decode_type2 "$value"`
-	echo -n $value | sed 's/[:@]/ /g' | awk "{print \$$2}"
+	echo $1 | sed 's/[:@]/ /g' | awk "{print \$$2}"
 }
 
-ip_get(){ 
-	local value
-	value=`value_get "$1" 3`
-	[ -z "$value" ] && return 1
-	echo "-s $value"
+#################################
+#Public functions
+#resource_decode resource
+resource_decode(){
+	local data
+	DECODE=""
+	data=`echo -n $1 | sed 's/#.*//;s/ *$//'`
+	[ -z "$data" ] && return 1
+	DECODE=`decode_type1 "$data"` && return 0
+	DECODE=`decode_type2 "$data"` && return 0
+	#decode fail
+	DECODE=""
+	return 1
 }
-port_get(){
+#resource_parse resource
+resource_parse(){
+	local name
 	local value
-	value=`value_get "$1" 4`
-	[ -z "$value" ] && return 1
-	echo "-p $value"
+	local count
+	count=1
+	#set +H
+	[ -z "$DECODE" ] && return 1
+	value_get "$DECODE" $count
+	for name in $PARAM_LIST;do
+		value=`value_get "$DECODE" $count`
+		eval $name="$value"
+		#echo "$count: $name=${value}"
+		#echo "$count: $name=$(eval echo \$$value)"
+		count=$((count+1))
+	done
+	return 0
 }
-passwd_get(){
-	local value
-	value=`value_get "$1" 2`
-	[ -z "$value" ] && return 1
-	echo "-k $value"
-}
-method_get(){
-	local value
-	value=`value_get "$1" 1`
-	[ -z "$value" ] && return 1
-	echo "-m $value"
+# config_generate port config_file
+config_generate(){
+	lport=$1
+	return 0
 }
 
-#EXECUTE='ss-local -l "$LISTEN" $ip $port $passwd $method'
-EXECUTE='ss-local -l $LISTEN $ip $port $passwd $method'
+# command_start config_file
+command_start(){
+	echo "ss-local -l $lport -s $ip -p $port -k $passwd -m $method"
+	ss-local -l $lport -s $ip -p $port -k $passwd -m $method >/dev/null 2>&1 &
+	return $!
+}
+# command_stop pid
+command_stop(){
+	kill $1
+}
+
+# command_run config_file
+command_run(){
+	nohup ss-local -l $lport -s $ip -p $port -k $passwd -m $method >/dev/null 2>&1
+}
+

@@ -1,0 +1,196 @@
+#!/bin/bash
+####################################
+#vmess://json_base64
+#{
+# "v": "2",
+# "ps": "remarks",
+# "add": "111.111.111.111",
+# "port": "32000",
+# "id": "1386f85e-657b-4d6e-9d56-78badb75e1fd",
+# "aid": "100",
+# "scy": "zero",
+# "net": "tcp",
+# "type": "none",
+# "host": "www.bbb.com",
+# "path": "/",
+# "tls": "tls",
+# "sni": "www.ccc.com"
+#}
+#
+#CMD:
+####################################
+PARAM_LIST="add port id aid scy net type host path tls"
+CHECK_LIST="add port id net"
+LISTEN=${LISTEN:-20000}
+#CFG_DIR=${CFG_DIR:-/tmp/vmess}
+
+#value_get base64_string index
+value_get(){
+	echo "$1" | jq ".$2" | sed 's/^null$//;s/"//g'
+}
+
+resource_parse(){
+	local value
+	local name
+	[ $? != 0 ] && return 1
+	for name in $PARAM_LIST;do
+		value=`value_get "${DECODE}" "$name"`
+		echo "$name:$value"
+		[ -z "$value" ] && {
+			eval $name=\"\"
+			continue
+		}
+		eval $name=\"$value\"
+	done
+	#Check list
+	for name in $CHECK_LIST;do
+		[ -z "${!name}" ] && {
+			WRN "${name} not defined"
+			return 1
+		}
+	done
+	#default variables
+	aid=${aid:-0}
+	scy=${scy:-auto}
+	type=${type:-none}
+	tls=${tls:-none}
+	#path=${path:-\/}
+	return 0
+}
+
+#inbound_generate listen_port
+inbound_generate(){
+	echo "\"inbounds\": [
+			{
+				\"port\": $1,
+				\"listen\": \"127.0.0.1\",
+				\"protocol\": \"socks\",
+				\"tag\": \"$1\",
+				\"sniffing\": {
+					\"enabled\": false
+				},
+				\"settings\": {
+					\"auth\": \"noauth\"
+				}
+			}
+		]"
+}
+
+outbound_generate(){
+	local setting
+	local stream
+	local wsSettings
+	local Comma
+	local Path
+	local Host
+	#generate outbound setting
+	setting="{
+		\"vnext\": [
+			{
+				\"address\": \"${add}\",
+				\"port\": ${port},
+				\"users\": [
+					{
+						\"id\": \"${id}\",
+						\"alterId\": ${aid},
+						\"security\": \"${scy}\",
+						\"level\": 0
+					}
+				]
+			}
+		]
+	}"
+	#generate transport setting
+	case "$net" in
+	"ws")
+		[ -n "$path" ] && Path="\"path\": \"${path}\""
+		[ -n "$host" ] && Host="\"headers\": {\"Host\": \"$host\"}"
+		[ -n "$Host" -a -n "$Path" ] && Comma=',' || Comma=""
+		[ -n "$Host" -o -n "$Path" ] && wsSettings=",\"wsSettings\": {${Path} ${Comma} ${Host}}"
+		stream="{
+			\"network\": \"ws\",
+			\"security\": \"$tls\"
+			${wsSettings}
+		}"
+	;;
+	"tcp")
+		stream="{
+			\"network\": \"tcp\",
+			\"security\": \"$tls\"
+		}"
+	;;
+	*)
+		WRN "Unsupported net type: $net"
+		return 1
+	;;
+	esac
+	#Finish outbound setting
+	echo "\"outbounds\": [
+			{
+			\"sendThrough\": \"0.0.0.0\",
+			\"protocol\": \"vmess\",
+			\"tag\": \"${add}:${port}\",
+			\"settings\": ${setting},
+			\"streamSettings\": ${stream}
+			}
+		]"
+}
+
+#################################
+#Public functions
+#resource_decode resource
+resource_decode(){
+	DECODE=`base64_decode $1` && return 0
+	#decode fail
+	DECODE=""
+	return 1
+}
+#resource_parse resource
+resource_parse(){
+	local value
+	local name
+	[ -z "$DECODE" ] && return 1
+	for name in $PARAM_LIST;do
+		value=`value_get "${DECODE}" "$name"`
+		eval $name=\"$value\"
+		#echo "$name:$value"
+	done
+	#default variables
+	aid=${aid:-0}
+	scy=${scy:-auto}
+	type=${type:-none}
+	tls=${tls:-none}
+	#path=${path:-\/}
+	return 0
+}
+
+# config_generate port config_file
+config_generate(){
+	echo "{" >$2.tmp
+	inbound_generate $1 >>$2.tmp
+	echo "," >>$2.tmp
+	outbound_generate >>$2.tmp
+	echo "}" >>$2.tmp
+	cat $2.tmp | jq > $2
+	rm -rf $2.tmp
+
+	return 0
+}
+# command_start config_file
+command_start(){
+	#[ ! -f $1 ] && return 1
+	echo "v2ray -c $1" # >/dev/null 2>&1 "
+	v2ray -c $1 >/dev/null 2>&1 &
+	sleep 1.5	#wait process ready
+	return $!
+}
+# command_stop pid
+command_stop(){
+	kill $1
+}
+
+# command_run config_file
+command_run(){
+	nohup v2ray -c $1 >/dev/null 2>&1
+	sleep 1.5	#wait process ready
+}

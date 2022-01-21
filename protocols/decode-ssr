@@ -7,14 +7,12 @@
 #	ssr-local -l $LISTEN -s $IP -p $PORT -k $PASSWD -m $METHOD
 ####################################
 PARAM_LIST="ip port protocol method obfs password obfsparam protoparam remarks group"
+CHECK_LIST="ip port protocol method password "
 LISTEN=${LISTEN:-20000}
 
 #value_get base64_string index
 value_get(){
-	local value
-	value=`base64_decode $1`
-	[ $? != 0 ] && return 1
-	echo "$value" | sed 's/[:\/\?]/ /g' | awk "{print \$$2}"
+	echo "$1" | sed 's/[:\/\?]/ /g' | awk "{print \$$2}"
 }
 
 ip_get(){ 
@@ -85,3 +83,48 @@ group_get(){
 
 #EXECUTE='ss-local -l "$LISTEN" $ip $port $passwd $method'
 EXECUTE='ssr-local -l $LISTEN $ip $port $method $password $obfs $obfsparam $protocol $protoparam'
+
+#################################
+#Public functions
+#resource_decode resource
+resource_decode(){
+	DECODE=`base64_decode $1` && return 0
+	#decode fail
+	DECODE=""
+	return 1
+}
+
+#resource_parse resource
+resource_parse(){
+	local name
+	local value
+	#set +H
+	[ -z "$DECODE" ] && return 1
+	for name in $PARAM_LIST;do
+		value=`${name}_get "$DECODE"`
+		eval $name=\"$value\"
+		#echo "$name=$value"
+		#echo "$name=$(eval echo \$$name)"
+	done
+	return 0
+}
+# config_generate port config_file
+config_generate(){
+	lport="-l $1"
+	return 0
+}
+# command_start config_file
+command_start(){
+	echo "ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam"
+	ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam >/dev/null 2>&1 &
+	return $!
+}
+# command_stop pid
+command_stop(){
+	kill $1
+}
+
+# command_run config_file
+command_run(){
+	nohup ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam >/dev/null 2>&1 &
+}
