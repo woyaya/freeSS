@@ -160,7 +160,7 @@ LOG "Result file: $VALID_FILE"
 	LOG "Run post script: $SCRIPT"
 	script=""
 	[ -x $CMD_DIR/$SCRIPT ] && script=$CMD_DIR/$SCRIPT
-	[ -x $SCRIPT ] && script=$SCRIPT
+	[ -x $BASE/$SCRIPT ] && script=$BASE/$SCRIPT
 	[ -z "$script" ] && ERR "Can not find script: $script"
 	$script -f $VALID_FILE
 }

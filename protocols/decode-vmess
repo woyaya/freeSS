@@ -171,7 +171,7 @@ config_generate(){
 	echo "," >>$2.tmp
 	outbound_generate >>$2.tmp
 	echo "}" >>$2.tmp
-	cat $2.tmp | jq > $2
+	cat $2.tmp | jq '.' >$2
 	rm -rf $2.tmp
 
 	return 0

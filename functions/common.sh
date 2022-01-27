@@ -46,7 +46,7 @@ base64_decode(){
 	remainder=$((len%4))
 	[ "$remainder" = 3 ] && atta="="
 	[ "$remainder" = 2 ] && atta="=="
-	echo -n "${str}${atta}" | base64 -d
+	echo -n "${str}${atta}" | base64 -d 2>/dev/null
 }
 
 wait_childs(){
