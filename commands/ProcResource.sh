@@ -1,5 +1,8 @@
 #!/bin/sh
 
+PATH=$PATH:/usr/local/bin:/usr/local/sbin
+export PATH
+
 FUN_DIR=${FUN_DIR:-./functions}
 CFG_DIR=${CFG_DIR:-./configs}
 CMD_DIR=${CMD_DIR:-./commands}
