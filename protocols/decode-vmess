@@ -1,61 +1,57 @@
 #!/bin/bash
 ####################################
-#vmess://json_base64
-#{
-# "v": "2",
-# "ps": "remarks",
-# "add": "111.111.111.111",
-# "port": "32000",
-# "id": "1386f85e-657b-4d6e-9d56-78badb75e1fd",
-# "aid": "100",
-# "scy": "zero",
-# "net": "tcp",
-# "type": "none",
-# "host": "www.bbb.com",
-# "path": "/",
-# "tls": "tls",
-# "sni": "www.ccc.com"
-#}
-#
+#EncodeType0:
+#	 vmess://json
+#	 {
+#	  "v": "2",
+#	  "ps": "remarks",
+#	  "add": "111.111.111.111",
+#	  "port": "32000",
+#	  "id": "1386f85e-657b-4d6e-9d56-78badb75e1fd",
+#	  "aid": "100",
+#	  "scy": "zero",
+#	  "net": "tcp",
+#	  "type": "none",
+#	  "host": "www.bbb.com",
+#	  "path": "/",
+#	  "tls": "tls",
+#	  "sni": "www.ccc.com"
+#	 }
+#EncodeType1:
+#	 vmess://json_base64
+#	 {
+#	  "v": "2",
+#	  "ps": "remarks",
+#	  "add": "111.111.111.111",
+#	  "port": "32000",
+#	  "id": "1386f85e-657b-4d6e-9d56-78badb75e1fd",
+#	  "aid": "100",
+#	  "scy": "zero",
+#	  "net": "tcp",
+#	  "type": "none",
+#	  "host": "www.bbb.com",
+#	  "path": "/",
+#	  "tls": "tls",
+#	  "sni": "www.ccc.com"
+#	 }
 #CMD:
 ####################################
-PARAM_LIST="add port id aid scy net type host path tls"
+PARAM_LIST="add port id aid scy security net type host path tls"
 CHECK_LIST="add port id net"
 LISTEN=${LISTEN:-20000}
 #CFG_DIR=${CFG_DIR:-/tmp/vmess}
 
-#value_get base64_string index
-value_get(){
-	echo "$1" | jq ".$2" | sed 's/^null$//;s/"//g'
-}
-
-resource_parse(){
-	local value
-	local name
-	[ $? != 0 ] && return 1
-	for name in $PARAM_LIST;do
-		value=`value_get "${DECODE}" "$name"`
-		#echo "$name:$value"
-		[ -z "$value" ] && {
-			eval $name=\"\"
-			continue
-		}
-		eval $name=\"$value\"
-	done
-	#Check list
-	for name in $CHECK_LIST;do
-		[ -z "${!name}" ] && {
-			WRN "${name} not defined"
-			return 1
-		}
-	done
-	#default variables
-	aid=${aid:-0}
-	scy=${scy:-auto}
-	type=${type:-none}
-	tls=${tls:-none}
-	#path=${path:-\/}
+decode_type0(){
+	local json
+	json=`echo "$@" | sed '/^ *{.*} *$/!d'`
+	[ -z "$json" ] && return 1
+	echo "$@" | jq -c -S 'del(.ps)' 2>/dev/null || return 1
 	return 0
+}
+decode_type1(){
+	local context
+	context=`base64_decode $1` || return 1
+	decode_type0 "$context"
 }
 
 #inbound_generate listen_port
@@ -140,21 +136,22 @@ outbound_generate(){
 #Public functions
 #resource_decode resource
 resource_decode(){
-	DECODE=`base64_decode $1` && return 0
-	#decode fail
-	DECODE=""
+	decode_type0 "$@" && return 0
+	decode_type1 "$@" && return 0
 	return 1
 }
-#resource_parse resource
+#resource_parse json
 resource_parse(){
 	local value
-	local name
-	[ -z "$DECODE" ] && return 1
-	for name in $PARAM_LIST;do
-		value=`value_get "${DECODE}" "$name"`
-		eval $name=\"$value\"
-		#echo "$name:$value"
-	done
+	local key
+	aid=""
+	scy=""
+	security=""
+	type=""
+	tls=""
+	json2variables "$@"
+	scy="${scy}${security}"
+	check_variables $CHECK_LIST
 	#default variables
 	aid=${aid:-0}
 	scy=${scy:-auto}
@@ -176,17 +173,54 @@ config_generate(){
 
 	return 0
 }
+# config4clash 
+config4clash(){
+	local Aid=$aid
+	[ "$aid" = "0" ] && Aid=32
+	echo -n "
+- name: \"PROXY\"
+  type: vmess
+  server: $add
+  port: $port
+  uuid: $id
+  alterId: $Aid
+  cipher: $scy
+"
+	case "$net" in
+		"ws")
+			echo "  network: ws"
+			[ -n "$path" -o -n "$host" ] && 
+				echo "  ws-opts:"
+			[ -n "$path" ] && 
+				echo "    path: ${path}"
+			[ -n "$host" ] && {
+				echo "    headers:"
+				echo "      Host: $host"
+			}
+		;;
+		"tcp")
+			echo ""
+		;;
+		*)
+			echo ""
+		;;
+	esac
+}
+
 # command_start config_file
 command_start(){
 	#[ ! -f $1 ] && return 1
 	echo "v2ray -c $1" # >/dev/null 2>&1 "
 	v2ray -c $1 >/dev/null 2>&1 &
+	ret=$?
+	_PID=$!
+	[ $ret != 0 ] && return 1
 	sleep 1.5	#wait process ready
-	return $!
+	return 0
 }
-# command_stop pid
+# command_stop
 command_stop(){
-	kill $1
+	[ -n "${_PID}" ] && kill ${_PID}
 }
 
 # command_run config_file

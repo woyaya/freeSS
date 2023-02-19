@@ -23,6 +23,7 @@ function cleanup() {
 		[ -d $WORK_DIR ] && rm  -rf $WORK_DIR
 	}
 }
+SCRIPT=()
 ############################
 while getopts ":b:t:c:P:p:f:svD" opt; do
 	case $opt in
@@ -42,21 +43,22 @@ while getopts ":b:t:c:P:p:f:svD" opt; do
 			FILE=$OPTARG
 		;;
 		P)
-			SCRIPT=$OPTARG
+			SCRIPT+=("$OPTARG")
 		;;
 		s)
 			DELETE=0
-			shift 1
+			#shift 1
 		;;
 		v)
 			LOG_LEVEL=$((LOG_LEVEL+1))
-			shift 1
+			#shift 1
 		;;
 		D)
 			DEBUG=1
 			DELETE=0
 			LOG_LEVEL=100
-			shift 1
+			COUNT=1
+			#shift 1
 		;;
 		*)
 			USAGE $0
@@ -95,7 +97,7 @@ export SRC_DIR FUN_DIR CMD_DIR CFG_DIR PROTO_DIR
 
 check_dirs $SRC_DIR $CMD_DIR $PROTO_DIR || ERR "Incomplete dirs"
 check_files $CMD_DIR/GetResource.sh $CMD_DIR/ProcResource.sh || ERR "Incomplete scripts"
-check_execs curl logger sed awk uniq sort wc base64 || ERR "Incomplete executes"
+check_execs curl logger sed awk uniq jq sort wc base64 || ERR "Incomplete executes"
 [ -n "$FILE" ] && {
 	mkdir -p `dirname $FILE` || ERR "Can not mkdir for dist file \"$FILE\""
 	touch $FILE || ERR "Can not create dist file: $FILE"
@@ -149,19 +151,23 @@ LOG "check valid resource size"
 [ -s $VALID_FILE ] || ERR "Fail: no proxy works in ${TIMEOUT}S"
 
 LOG "Sort valid server by responce time"
-cat $VALID_FILE | sed 's/^[0-9]*\t//' | sort  >$VALID_FILE.tmp
+cat $VALID_FILE | sed 's/^[0-9]*\t//' | sort | uniq >$VALID_FILE.tmp
 mv $VALID_FILE.tmp $VALID_FILE
 LOG "Result file: $VALID_FILE"
 [ -n "$FILE" ] && {
 	LOG "Save result to file: $FILE"
 	cp -f $VALID_FILE $FILE
 }
-[ -n "$SCRIPT" ] && {
-	LOG "Run post script: $SCRIPT"
-	script=""
-	[ -x $CMD_DIR/$SCRIPT ] && script=$CMD_DIR/$SCRIPT
-	[ -x $BASE/$SCRIPT ] && script=$BASE/$SCRIPT
-	[ -z "$script" ] && ERR "Can not find script: $script"
-	$script -f $VALID_FILE
+
+[ "${#SCRIPT[@]}" -ge 1 ] && {
+	for script in ${SCRIPT[@]};do
+		LOG "Run post script: $script"
+		cmd=""
+		[ -x $CMD_DIR/$script ] && cmd=$CMD_DIR/$script
+		[ -x $BASE/$script ] && cmd=$BASE/$script
+		[ -x $script ] && cmd=$script
+		[ -z "$cmd" ] && ERR "Can not find script: $script"
+		$cmd -f $VALID_FILE
+	done
 }
 echo "Finished"

@@ -3,6 +3,13 @@
 #ss://method:password@server:port
 #eg:
 #       aes-256-gcm:CUndSZnYsPKcu6Kj8THVMBHD@103.156.50.107:39772
+#EncodeType0: json
+# {
+# 	"method": "xxx",
+# 	"passwd": "xxx",
+# 	"ip": "xxxx",
+# 	"port": "xxx",
+# }
 #EncodeType1:
 #	(method:password | base64)@server:port
 #EncodeType2:
@@ -13,6 +20,40 @@
 PARAM_LIST="method passwd ip port"
 CHECK_LIST="method passwd ip port"
 
+#value_get string index
+value_get(){
+	echo $1 | sed 's/[:@]/ /g' | awk "{print \$$2}"
+}
+#decode_parse decoded_string
+decode2json(){
+	local name
+	local value
+	local count
+	local context
+	local String="$@"
+	count=1
+	#set +H
+	[ -z "$String" ] && return 1
+	for name in $PARAM_LIST;do
+		value=`value_get "$String" $count`
+		[ "$name" = "$passwd" ] && {
+			context=`base64_decode "$value"` && value="$context"
+		}
+		eval $name="$value"
+		count=$((count+1))
+	done
+	variables2json $PARAM_LIST
+	return 0
+}
+
+decode_type0(){
+	local json
+	json=`echo "$@" | sed '/^ *{.*} *$/!d'`
+	[ -z "$json" ] && return 1
+	json=`echo "$@" | jq -c -S 'del(.name)' 2>/dev/null`
+	[ -z "$json" ] && return 1
+	echo "$json"
+}
 decode_type1(){
 	local prefix
 	local suffix
@@ -25,16 +66,15 @@ decode_type1(){
 	#Find ":" in result
 	prefix=`echo "$result" | sed 's/.*:.*//'`
 	[ -n "$prefix" ] && return 1
-	echo "${result}@${suffix}"
+	decode2json "${result}@${suffix}"
 	return 0
 }
 decode_type2(){
-	base64_decode "$1"
-}
-
-#value_get base64_string index
-value_get(){
-	echo $1 | sed 's/[:@]/ /g' | awk "{print \$$2}"
+	local String
+	String=`base64_decode "$1"`
+	[ -z "$String" ] && return 1
+	decode2json "${String}"
+	return 0
 }
 
 #################################
@@ -42,47 +82,47 @@ value_get(){
 #resource_decode resource
 resource_decode(){
 	local data
-	DECODE=""
 	data=`echo -n $1 | sed 's/#.*//;s/ *$//'`
 	[ -z "$data" ] && return 1
-	DECODE=`decode_type1 "$data"` && return 0
-	DECODE=`decode_type2 "$data"` && return 0
+	decode_type0 "$data" && return 0
+	decode_type1 "$data" && return 0
+	decode_type2 "$data" && return 0
 	#decode fail
-	DECODE=""
 	return 1
 }
-#resource_parse resource
+#resource_parse json
 resource_parse(){
-	local name
-	local value
-	local count
-	count=1
-	#set +H
-	[ -z "$DECODE" ] && return 1
-	for name in $PARAM_LIST;do
-		value=`value_get "$DECODE" $count`
-		eval $name="$value"
-		#echo "$count: $name=${value}"
-		#echo "$count: $name=$(eval echo \$$value)"
-		count=$((count+1))
-	done
-	return 0
+	json2variables $1
+	check_variables $CHECK_LIST
 }
 # config_generate port config_file
 config_generate(){
 	lport=$1
 	return 0
 }
+#  config4clash json
+config4clash(){
+	echo -n "
+- name: \"PROXY\"
+  type: ss
+  server: $ip
+  port: $port
+  cipher: $method
+  password: \"$passwd\"
+"
+}
 
 # command_start config_file
 command_start(){
 	echo "ss-local -l $lport -s $ip -p $port -k $passwd -m $method"
 	ss-local -l $lport -s $ip -p $port -k $passwd -m $method >/dev/null 2>&1 &
-	return $!
+	ret=$?
+	_PID=$!
+	return $ret
 }
-# command_stop pid
+# command_stop
 command_stop(){
-	kill $1
+	[ -n "$_PID" ] && kill ${_PID}
 }
 
 # command_run config_file

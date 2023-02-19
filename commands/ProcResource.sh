@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 FUN_DIR=${FUN_DIR:-./functions}
 CFG_DIR=${CFG_DIR:-./configs}
@@ -42,44 +42,45 @@ while getopts ":l:t:f:i:rcDv" opt; do
 	case $opt in
 		f)
 			DIST=$OPTARG
-			shift 2
+			#shift 2
 		;;
 		l)
 			LISTEN=$OPTARG
-			shift 2
+			#shift 2
 		;;
 		t)
 			TIMEOUT=$OPTARG
-			shift 2
+			#shift 2
 		;;
 		i)
 			index=$OPTARG
-			shift 2
+			#shift 2
 		;;
 		c)
 			CHECK=1
 			RUN=""
-			shift 1
+			#shift 1
 		;;
 		r)
 			RUN=1
 			CHECK=""
-			shift 1
+			#shift 1
 		;;
 		v)
-			verbose
-			shift 1
+			LOG_LEVEL=$((LOG_LEVEL+1))
+			#shift 1
 		;;
 		D)
 			DEBUG=1
 			LOG_LEVEL=100
-			shift 1
+			#shift 1
 		;;
 		*)
 			USAGE $0
 		;;
 	esac
 done
+shift "$(( OPTIND - 1 ))"
 
 resource="$@"
 index=${index:-0}
@@ -101,8 +102,12 @@ PREFIX=`get_prefix "$resource"`
 LOG "Try to parse resource: \"$resource\""
 CONTENT=`drop_prefix $resource`
 [ -z "$CONTENT" ] && cleanup "Invalid resource: $resource"
-resource_decode "$CONTENT" || ERR "Decode resource fail: $resource"
-resource_parse "$CONTENT" || ERR "Parse resource fail: $resource"
+DBG "Context: $CONTENT"
+JSON=`resource_decode "$CONTENT"` || ERR "Decode resource fail: $resource"
+resource="${PREFIX}://$JSON"
+LOG "Decode result: $JSON"
+resource_parse "$JSON" || ERR "Parse resource fail: $JSON"
+DBG "Parse succ: $JSON"
 [ -n "$CHECK_LIST" ] && {
 	for name in $CHECK_LIST;do
 		#[ -z "${!name}" ] && ERR "Check variable fail: $name"
@@ -113,8 +118,7 @@ config_generate $LISTEN $CFG || ERR "Generate config fail: $resource"
 
 #Start command
 [ "$CHECK" = "1" ] && {
-	command_start $CFG
-	PID=$?
+	command_start $CFG || ERR "Start command fail: $resource"
 
 	TIMES=0
 	RETRY=3
@@ -131,15 +135,15 @@ config_generate $LISTEN $CFG || ERR "Generate config fail: $resource"
 		TIMES=`expr $TIMES "+" $COST`
 		sleep 1
 	done
-	command_stop $PID
+	command_stop
 	#[ "$RESULT" = "$RETRY" ] && cleanup
 	[ "$RESULT" = "$RETRY" ] && ERR "Resource fail: $resource"
 	#take more then 3S, ignore it
 	[ $TIMES -gt $TIME_THRESHOLD ] && ERR "Resource timeout: $resource"
 	#TIMES=${TIMES:0-4}
 	TIMES=`echo -n "00000$TIMES" | tail -c 5`
-	LOG "$TIMES\t$resource"
-	echo "$TIMES\t$resource" >>$DIST
+	LOG "$TIMES  $resource"
+	echo -e "$TIMES\t${resource}" >>$DIST
 }
 [ "$RUN" = "1" ] && {
 	command_run $CFG

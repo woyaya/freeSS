@@ -51,7 +51,10 @@ LOG "MD5: $MD5_SRC, $MD5_HTTP"
 	WRN "File $SRC unchanged, do nothing"
 	return 0
 }
-cp $SRC $HTTP_FILE
+cp $SRC $HTTP_FILE.tmp
+cat $SRC | base64 >${HTTP_FILE}.src.tmp
+mv $HTTP_FILE.tmp $HTTP_FILE
+mv $HTTP_FILE.src.tmp $HTTP_FILE.src
 
 check_files $CFG_DIR/mqtt.cfg || ERR "Can not find mqtt setting"
 . $CFG_DIR/mqtt.cfg

@@ -7,8 +7,25 @@
 #params_base64:
 #	(params_context | base64)
 #
-#EncodeType1:
+#EncodeType0: json
+# {
+# 	"method": "xxx",
+# 	"passwd": "xxx",
+# 	"ip": "xxxx",
+# 	"port": "xxx",
+# 	"protocol": "xxx",
+# 	"obfs": "xxx",
+# 	"obfsparam": "xxx",
+# 	"protoparam": "xxx",
+# 	"remarks ": "xxx",
+# 	"group": "xxx"
+# }
+
+#EncodeType0:
 #	(server:port:protocol:method:obfs:password_base64/?params_base64) | base64
+#
+#EncodeType1:
+#	server:port:protocol:method:obfs:password_base64/?params
 #
 #EncodeType2:
 #	(server:port:protocol:method:obfs:password_base64/?params_context) | base64
@@ -16,10 +33,60 @@
 #CMD:
 #	ssr-local -l $LISTEN -s $IP -p $PORT -k $PASSWD -m $METHOD
 ####################################
-PARAM_LIST="ip port protocol method obfs password obfsparam protoparam remarks group"
-CHECK_LIST="ip port protocol method password "
+LIST_1="ip port protocol method obfs passwd "
+LIST_2="obfsparam protoparam"
+PARAM_LIST="$LIST_1 $LIST_2"
+CHECK_LIST="ip port protocol method passwd "
 LISTEN=${LISTEN:-20000}
 
+#value_get string index
+value_get(){
+	echo "$1" | sed 's/[:\/\?]/ /g' | awk "{print \$$2}"
+}
+param_get(){
+	local params
+	params=`value_get $1 7`
+	[ -z "$params" ] && return 0
+	params=`echo "$params" | sed "/$2/!d;s/.*$2=//;s/&.*//"`
+	[ -z "$params" ] && return 0
+	base64_decode "$params"
+	return 0
+}
+
+#decode_parse decoded_string
+decode2json(){
+	local name
+	local value
+	local count
+	local context
+	local String="$@"
+	count=1
+	#set +H
+	[ -z "$String" ] && return 1
+	for name in $LIST_1;do
+		value=`value_get "$String" $count`
+		[ "$name" = "passwd" ] && {
+			context=`base64_decode "$value"` && value="$context"
+		}
+		eval $name="$value"
+		count=$((count+1))
+	done
+	for name in $LIST_2;do
+		value=`param_get "$String" $name`
+		eval $name="$value"
+	done
+	variables2json $PARAM_LIST
+	return 0
+}
+
+decode_type0(){
+	local json
+	json=`echo "$@" | sed '/^ *{.*} *$/!d'`
+	[ -z "$json" ] && return 1
+	json=`echo "$@" | jq -c -S 2>/dev/null`
+	[ -z "$json" ] && return 1
+	echo "$json"
+}
 decode_type1(){
 	local value
 	local params_base64
@@ -30,80 +97,14 @@ decode_type1(){
 	params_context=`base64_decode "$params_base64"` || return 1
 	value=`echo "$value" | sed 's/\/?.*//'`
 	echo "${value}/?${params_context}"
+	decode2json "${value}/?${params_context}"
 	return 0
 }
 decode_type2(){
-	base64_decode "$1"
-}
-
-#value_get base64_string index
-value_get(){
-	echo "$1" | sed 's/[:\/\?]/ /g' | awk "{print \$$2}"
-}
-
-ip_get(){ 
-	local value
-	value=`value_get "$1" 1`
-	[ -z "$value" ] && return 1
-	echo "-s $value"
-}
-port_get(){
-	local value
-	value=`value_get "$1" 2`
-	[ -z "$value" ] && return 1
-	echo "-p $value"
-}
-protocol_get(){
-	local value
-	value=`value_get "$1" 3`
-	[ -z "$value" ] && return 0
-	echo "-O $value"
-}
-method_get(){
-	local value
-	value=`value_get "$1" 4`
-	[ -z "$value" ] && return 1
-	echo "-m $value"
-}
-obfs_get(){
-	local value
-	value=`value_get "$1" 5`
-	[ -z "$value" ] && return 0
-	echo "-o $value"
-}
-password_get(){
-	local value
-	value=`value_get "$1" 6`
-	[ -z "$value" ] && return 1
-	value=`base64_decode "$value"`
-	echo "-k $value"
-}
-
-param_get(){
-	local params
-	params=`value_get $1 7`
-	[ -z "$params" ] && return 0
-	params=`echo "$params" | sed "/$2/!d;s/.*$2=//;s/&.*//"`
-	[ -z "$params" ] && return 0
-	base64_decode "$params"
-	return 0
-}
-obfsparam_get(){
-	local value
-	value=`param_get "$1" obfsparam`
-	[ -z "$value" ] && return 0
-	echo "-g $value"
-}
-protoparam_get(){
-	local value
-	value=`param_get "$1" protoparam`
-	[ -z "$value" ] && return 0
-	echo "-G $value"
-}
-remarks_get(){
-	return 0
-}
-group_get(){
+	local String
+	String=`base64_decode "$1"`
+	[ -z "$String" ] && return 1
+	decode2json "${String}"
 	return 0
 }
 
@@ -111,45 +112,67 @@ group_get(){
 #Public functions
 #resource_decode resource
 resource_decode(){
-	DECODE=`decode_type1 "$1"` && return 0
-	DECODE=`decode_type2 "$1"` && return 0
+	[ -z "$1" ] && return 1
+	decode_type0 "$1" && return 0
+	decode_type1 "$1" && return 0
+	decode_type2 "$1" && return 0
 	#decode fail
-	DECODE=""
 	return 1
 }
 
-#resource_parse resource
+#resource_parse json
 resource_parse(){
-	local name
-	local value
+	Protocol=""
+	Obfs=""
 	#set +H
-	[ -z "$DECODE" ] && return 1
-	for name in $PARAM_LIST;do
-		value=`${name}_get "$DECODE"`
-		eval $name=\"$value\"
-		#echo "$name=$value"
-		#echo "$name=$(eval echo \$$name)"
-	done
+	json2variables $1
+	check_variables $CHECK_LIST
+	[ -n "$protocol" ] && {
+		Protocol="-O $protocol"
+		[ -n "$protoparam" ] && Protocol="$Protocol -G $protoparam"
+	}
+	[ -n "$obfs" ] && {
+		Obfs="-o $obfs"
+		[ -n "$obfsparam" ] && Obfs="$Obfs -g $obfsparam"
+	}
 	return 0
 }
 # config_generate port config_file
 config_generate(){
-	lport="-l $1"
+	lport="$1"
 	return 0
+}
+#  config4clash 
+config4clash(){
+	echo -n "
+- name: \"PROXY\"
+  type: ssr
+  server: $ip
+  port: $port
+  cipher: $method
+  password: \"$passwd\"
+"
+	[ -n "$obfsparam" ] && 
+		echo "  obfs: \"$obfsparam\""
+	[ -n "$protoparam" ] && 
+		echo "  protocol: \"$protoparam\""
 }
 # command_start config_file
 command_start(){
-	echo "ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam"
-	ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam >/dev/null 2>&1 &
-	return $!
+	local ret
+	echo "ssr-local -l $lport -s $ip -p $port -m $method -k $passwd $Obfs $Protocol"
+	ssr-local -l $lport -s $ip -p $port -m $method -k $passwd $Obfs $Protocol >/dev/null 2>&1 &
+	ret=$?
+	_PID=$!
+	return $ret
 }
-# command_stop pid
+# command_stop
 command_stop(){
-	kill $1
+	[ -n "${_PID}" ] && kill ${_PID}
 }
 
 # command_run config_file
 command_run(){
-	nohup ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam >/dev/null 2>&1 &
-	echo "ssr-local $lport $ip $port $method $password $obfs $obfsparam $protocol $protoparam >/dev/null 2>&1"
+	nohup ssr-local -l $lport -s $ip -p $port -m $method -k $passwd $Obfs $Protocol >/dev/null 2>&1 &
+	echo "ssr-local -l $lport -s $ip -p $port -m $method -k $passwd $Obfs $Protocol >/dev/null 2>&1"
 }

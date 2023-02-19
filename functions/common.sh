@@ -68,6 +68,28 @@ drop_prefix(){
 	echo "$1" | sed '/:\/\//!d;s/.*:\/\///'
 }
 
+#json2variables json
+json2variables(){
+	local String
+	local data
+	String=`echo $1 | sed 's/":/=/g;s/,"/ /g;s/^{"//;s/}$//'`
+	for data in $String;do
+		eval "$data"
+	done
+}
+variables2json(){
+	local json=""
+	for name in $@;do
+		json="${json},\"$name\":\"${!name}\""
+	done
+	echo "{${json}}" | sed 's/^{,/{/'
+	return 0
+}
+#json_get_value json key
+json_get_value(){
+	echo "$1" | jq ".$2" | sed 's/^null$//;s/^"//;s/"$//'
+}
+
 check_variables(){
 	local val
 	local chk
