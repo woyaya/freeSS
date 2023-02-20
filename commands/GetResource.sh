@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 FUN_DIR=${FUN_DIR:-./functions}
 CFG_DIR=${CFG_DIR:-./configs}

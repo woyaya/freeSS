@@ -82,7 +82,7 @@ decode_type2(){
 #resource_decode resource
 resource_decode(){
 	local data
-	data=`echo -n $1 | sed 's/#.*//;s/ *$//'`
+	data=`echo -n $1 | sed 's/#.*//;s/\/?.*//;s/ *$//'`
 	[ -z "$data" ] && return 1
 	decode_type0 "$data" && return 0
 	decode_type1 "$data" && return 0
