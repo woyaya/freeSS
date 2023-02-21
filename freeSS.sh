@@ -9,6 +9,7 @@ USAGE(){
 	echo "     -c COUNT: parallel count when check resources. default: 50"
 	echo "     -p PORT: local listen port when check resources. default: 20000"
 	echo "     -f FILE: save valid resources to this file."
+	echo "     -M max_number: save up to [max_number] valid resources. default: 0(save all valid resources)"
 	echo "     -P script: script to be executed after success get resource"
 	echo "     -s: do not delete temp files"
 	echo "     -v: more verbose output"
@@ -24,8 +25,9 @@ function cleanup() {
 	}
 }
 SCRIPT=()
+MAX=0
 ############################
-while getopts ":b:t:c:P:p:f:svD" opt; do
+while getopts ":b:t:c:P:p:f:M:svD" opt; do
 	case $opt in
 		b)
 			BASE=$OPTARG
@@ -41,6 +43,9 @@ while getopts ":b:t:c:P:p:f:svD" opt; do
 		;;
 		f)
 			FILE=$OPTARG
+		;;
+		M)
+			MAX=$OPTARG
 		;;
 		P)
 			SCRIPT+=("$OPTARG")
@@ -151,7 +156,8 @@ LOG "check valid resource size"
 [ -s $VALID_FILE ] || ERR "Fail: no proxy works in ${TIMEOUT}S"
 
 LOG "Sort valid server by responce time"
-cat $VALID_FILE | sed 's/^[0-9]*\t//' | sort | uniq >$VALID_FILE.tmp
+[ "$MAX" -le 0 ] && MAX=999999 || LOG "Save max $MAX resources"
+cat $VALID_FILE | head -n $MAX | sed 's/^[0-9]*\t//' | sort | uniq >$VALID_FILE.tmp
 mv $VALID_FILE.tmp $VALID_FILE
 LOG "Result file: $VALID_FILE"
 [ -n "$FILE" ] && {
