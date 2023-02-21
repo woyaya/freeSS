@@ -60,6 +60,7 @@ mkdir -p `dirname $TMP`
 rm -rf $TMP
 trap cleanup EXIT
 
+INDEX=1
 LOG "Read config from $SRC and convert to clash"
 while read resource;do
 	PREFIX=`get_prefix "$resource"`
@@ -76,8 +77,9 @@ while read resource;do
 	LOG "Decode result: $JSON"
 	resource_parse "$JSON" || ERR "Parse resource fail: $JSON"
 	DBG "Parse succ: $JSON"
-	clash=`config4clash`
+	clash=`config4clash $INDEX`
 	echo "$clash" >>$TMP
+	INDEX=$((INDEX+1))
 done <$SRC
 LOG "Check file size"
 [ ! -s $TMP ] && ERR "No resource found"

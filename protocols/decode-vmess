@@ -173,12 +173,12 @@ config_generate(){
 
 	return 0
 }
-# config4clash 
+# config4clash index
 config4clash(){
 	local Aid=$aid
 	[ "$aid" = "0" ] && Aid=32
 	echo -n "
-- name: \"PROXY\"
+- name: \"PROXY_$1\"
   type: vmess
   server: $add
   port: $port

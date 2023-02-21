@@ -100,10 +100,10 @@ config_generate(){
 	lport=$1
 	return 0
 }
-#  config4clash json
+#  config4clash index
 config4clash(){
 	echo -n "
-- name: \"PROXY\"
+- name: \"PROXY_$1\"
   type: ss
   server: $ip
   port: $port
