@@ -152,10 +152,16 @@ config4clash(){
   cipher: $method
   password: \"$passwd\"
 "
-	[ -n "$obfsparam" ] && 
-		echo "  obfs: \"$obfsparam\""
-	[ -n "$protoparam" ] && 
-		echo "  protocol: \"$protoparam\""
+	[ -n "$obfs" ] && {
+		echo "  obfs: $obfs"
+		[ -n "$obfsparam" ] && 
+			echo "  obfsparam: \"$obfsparam\""
+	}
+	[ -n "$protocol" ] && {
+		echo "  protocol: $protocol"
+		[ -n "$protoparam" ] && 
+			echo "  protoparam: \"$protoparam\""
+	}
 }
 # command_start config_file
 command_start(){

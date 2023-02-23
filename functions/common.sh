@@ -68,11 +68,15 @@ drop_prefix(){
 	echo "$1" | sed '/:\/\//!d;s/.*:\/\///'
 }
 
+filename_prefix(){
+	basename $1 | sed 's/\(.*\)\..*/\1/'
+}
+
 #json2variables json
 json2variables(){
 	local String
 	local data
-	String=`echo $1 | sed 's/":/=/g;s/,"/ /g;s/^{"//;s/}$//'`
+	String=`echo $@ | sed 's/": *"/="/g;s/, *"/ /g;s/^{ *"//;s/}$//'`
 	for data in $String;do
 		eval "$data"
 	done
@@ -114,6 +118,19 @@ check_files(){
 	done
 	return 0
 }
+# check_file_size file min_size max_size
+check_file_size(){
+	local size
+	local min=${2:-0}
+	local max=${3:-0}
+	check_files $1 || return 1
+	size=`wc -c $1 | awk '{print $1}'`
+	[ "$size" -lt "$min" -o "$size" -gt "$max" ] && {
+		WRN "File size outof range[$min, $max]: $size"
+		return 1
+	}
+	return 0
+}
 check_dirs(){
 	local chk
 	[ "$#" -eq 0 ] && ERR "No params"
@@ -138,3 +155,12 @@ check_execs(){
 	done
 	return 0
 }
+
+# download URL DIST_FILE
+download(){
+	local QUIET="-q "
+	DBG "Download from $1 to $2"
+	[ $LOG_LEVEL -ge 4 ] && QUIET=""
+	wget $QUIET $1 -O $2
+}
+
