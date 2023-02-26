@@ -48,7 +48,8 @@ SRC_GET(){
 		[ -z "$KEY" -o -z "$TAG" ] && ERR "Both \"KEY\" and \"TAG\" should define"
 		#eg:
 		#  sed -e '/SS节点/,/<\/pre>/!d;/<pre>/,/<\/pre>/!d;s/.*<pre>//;s/<\/pre>.*//'
-		SED_CMD="/$KEY/,/<\/$TAG>/!d;/<$TAG>/,/<\/$TAG>/!d;s/.*<$TAG>//;s/<\/$TAG>.*//"
+		#SED_CMD="/$KEY/,/<\/$TAG>/!d;/<$TAG>/,/<\/$TAG>/!d;s/.*<$TAG>//;s/<\/$TAG>.*//"
+		SED_CMD="s/<[^>]\+>//g;/$KEY/!d"
 		DBG "curl --max-filesize 2M -s $PARAM $URL | sed -e \"${SED_CMD}\" >$SRC"
 		curl --max-filesize 2M -s $PARAM $URL | sed -e "${SED_CMD}" >$SRC
 	}
