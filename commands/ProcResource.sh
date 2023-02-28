@@ -92,7 +92,7 @@ TIMEOUT=${TIMEOUT:-2}
 DIST=${DIST:-$$-$EXEC.dst}
 URL="http://www.youtube.com/generate_204"
 [ -z "$RUN$CHECK" ] && CHECK=1
-CFG=$DIST-$LISTEN.cfg
+CFG=$DIST-$LISTEN.json
 
 #Check varables
 check_variables resource || ERR "Not all key varables defined"

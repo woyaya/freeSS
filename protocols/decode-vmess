@@ -205,11 +205,22 @@ config4clash(){
 	esac
 }
 
+v2ray_version(){
+	local version
+	version=`v2ray -version 2>/dev/null | awk '/V2Ray/ {print $2}'`
+	[ -z "$version" ] && version=`v2ray version 2>/dev/null | awk '/V2Ray/ {print $2}'`
+	echo "$version" | sed 's/\..*//'
+}
+
 # command_start config_file
 command_start(){
+	local version
+	local V2RAY
 	#[ ! -f $1 ] && return 1
-	echo "v2ray -c $1" # >/dev/null 2>&1 "
-	v2ray -c $1 >/dev/null 2>&1 &
+	version=`v2ray_version`
+	[ "$version" -ge 5 ] && V2RAY="v2ray run" || V2RAY="v2ray"
+	echo "$V2RAY -c $1" # >/dev/null 2>&1 "
+	$V2RAY -c $1 >/dev/null 2>&1 &
 	ret=$?
 	_PID=$!
 	[ $ret != 0 ] && return 1
@@ -223,7 +234,11 @@ command_stop(){
 
 # command_run config_file
 command_run(){
-	nohup v2ray -c $1 >/dev/null 2>&1 &
-	echo "v2ray -c $1 >/dev/null 2>&1"
+	local V2RAY
+	local version
+	version=`v2ray_version`
+	[ "$version" -ge 5 ] && V2RAY="v2ray run" || V2RAY="v2ray"
+	nohup $V2RAY -c $1 >/dev/null 2>&1 &
+	echo "$V2RAY -c $1 >/dev/null 2>&1"
 	sleep 1.5	#wait process ready
 }
