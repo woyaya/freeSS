@@ -1,4 +1,12 @@
 
+RED(){ echo -e "\033[31m\033[01m$1\033[0m";}
+GREEN(){ echo -e "\033[32m\033[01m$1\033[0m";}
+YELLOW(){ echo -e "\033[33m\033[01m$1\033[0m";}
+BLUE(){ echo -e "\033[36m\033[01m$1\033[0m";}
+WHITE(){ echo -e "\033[37m\033[01m$1\033[0m";}
+BBLUE(){ echo -e "\033[34m\033[01m$1\033[0m";}
+RRED(){ echo -e "\033[35m\033[01m$1\033[0m";}
+
 LOG_LEVEL=${LOG_LEVEL:-2}
 [ -z "$EXEC" ] && {
 	EXEC=`basename $0`
@@ -13,25 +21,34 @@ _LOG(){
 }
 
 DBG(){
-	[ $LOG_LEVEL -ge 6 ] && echo "${EXEC}: $@"
+	[ $LOG_LEVEL -ge 6 ] && WHITE "${EXEC}: $@"
 	return 0
 }
 
 LOG(){
-	[ $LOG_LEVEL -ge 5 ] && echo "$@"
+	[ $LOG_LEVEL -ge 5 ] && WHITE "${EXEC}: $@"
 	return 0
 }
 INF(){
-	[ $LOG_LEVEL -ge 4 ] && _LOG "$@"
+	[ $LOG_LEVEL -ge 4 ] && {
+		GREEN "${EXEC}: $@"
+		_LOG "$@"
+	}
 	return 0
 }
 WRN(){
-	[ $LOG_LEVEL -ge 2 ] && _LOG "$@"
+	[ $LOG_LEVEL -ge 2 ] && {
+		YELLOW "${EXEC}: $@"
+		_LOG "$@"
+	}
 	return 0
 }
 
 ERR(){
-	[ $LOG_LEVEL -ge 1 ] && _LOG "$@"
+	[ $LOG_LEVEL -ge 1 ] && {
+		RED "${EXEC}: $@"
+		_LOG "$@"
+	}
 	exit 1
 }
 
